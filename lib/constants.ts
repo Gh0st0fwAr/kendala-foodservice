@@ -31,13 +31,3 @@ export const IS_SEND_NOTIFICATION: ModeNotif = 1
 export const LC = 20
 
 export const BANNER = "banner-azure"
-
-/**
- * !!! TEMP DEV ONLY — снять перед сдачей/деплоем на прод !!!
- * true = время как понедельник 10:00 (удобно тестить в вс, когда все дни «прошли»).
- * false = реальное время (или ?mockTime= в URL).
- */
-export const DEV_FORCE_MONDAY_MORNING = false
-
-/** ISO local wall-clock used when DEV_FORCE_MONDAY_MORNING is on */
-export const DEV_FORCE_MONDAY_ISO = "2026-09-21T10:00:00" 

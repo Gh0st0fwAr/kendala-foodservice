@@ -1,17 +1,11 @@
 /**
- * Utility for mocking `Date` during testing.
+ * Optional Date override for local/devtools testing via URL:
+ * `?mockTime=2026-04-06T13:00:00`
  *
- * Usage: append `?mockTime=2026-04-06T13:00:00` to the URL.
- * Or set DEV_FORCE_MONDAY_MORNING in lib/constants.ts (temp local testing).
- *
- * Both server and client code should call `getMockDate()` instead of `new Date()`
- * so the mocked time is respected everywhere.
+ * Production uses real time unless that query param is present.
  */
 
-import { DEV_FORCE_MONDAY_ISO, DEV_FORCE_MONDAY_MORNING } from "@/lib/constants"
-
 function getMockTimeFromQuery(): Date | null {
-  // Works in browser
   if (typeof window !== "undefined") {
     const params = new URLSearchParams(window.location.search)
     const mock = params.get("mockTime")
@@ -23,26 +17,13 @@ function getMockTimeFromQuery(): Date | null {
   return null
 }
 
-/**
- * Return mocked Date (query → DEV Monday flag → real now).
- */
+/** Real now, or URL mockTime when set. */
 export function getMockDate(): Date {
-  const fromQuery = getMockTimeFromQuery()
-  if (fromQuery) return fromQuery
-  if (DEV_FORCE_MONDAY_MORNING) {
-    const d = new Date(DEV_FORCE_MONDAY_ISO)
-    if (!isNaN(d.getTime())) return d
-  }
-  return new Date()
+  return getMockTimeFromQuery() ?? new Date()
 }
 
-/**
- * Returns a human-readable label for UI hints (optional).
- * `undefined` means real time is in use.
- */
+/** UI hint when mockTime is active; undefined = real clock. */
 export function getMockTimeLabel(): string | undefined {
   const fromQuery = getMockTimeFromQuery()
-  if (fromQuery) return fromQuery.toISOString()
-  if (DEV_FORCE_MONDAY_MORNING) return `DEV_FORCE_MONDAY ${DEV_FORCE_MONDAY_ISO}`
-  return undefined
+  return fromQuery ? fromQuery.toISOString() : undefined
 }
