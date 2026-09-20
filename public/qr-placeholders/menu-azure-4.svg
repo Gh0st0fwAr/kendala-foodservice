@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="720" height="1280" viewBox="0 0 720 1280">
+  <defs>
+    <linearGradient id="g" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#001F3F"/>
+      <stop offset="100%" stop-color="#003D82"/>
+    </linearGradient>
+  </defs>
+  <rect width="720" height="1280" fill="url(#g)"/>
+  <text x="360" y="160" text-anchor="middle" fill="#00A8E8" font-family="Arial,sans-serif" font-size="28" font-weight="700">AZURE</text>
+  <text x="360" y="220" text-anchor="middle" fill="#87CEEB" font-family="Arial,sans-serif" font-size="18">обеденное меню · MOCK</text>
+  <rect x="80" y="320" width="560" height="560" rx="16" fill="#002B55" stroke="#00A8E8" stroke-width="3"/>
+  <text x="360" y="560" text-anchor="middle" fill="#FFFFFF" font-family="Arial,sans-serif" font-size="96" font-weight="700">ЧТ</text>
+  <text x="360" y="640" text-anchor="middle" fill="#87CEEB" font-family="Arial,sans-serif" font-size="28">день 4</text>
+  <text x="360" y="980" text-anchor="middle" fill="#87CEEB" font-family="Arial,sans-serif" font-size="16">menu-azure-4 · заменить на реальную афишу</text>
+  <text x="360" y="1120" text-anchor="middle" fill="#6688AA" font-family="Arial,sans-serif" font-size="14">только для проверки QR / локальный плейсхолдер</text>
+</svg>

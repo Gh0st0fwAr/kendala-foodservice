@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
 import { Header } from "@/components/header"
 import { useLanguage } from "@/components/language-provider"
 import { Button } from "@/components/ui/button"
@@ -40,34 +40,22 @@ import Image from "next/image"
 import {
   ORDER_START_HOUR,
   ORDER_START_MINUTS,
-  DELIVERY_FEE,
-  PRICE_DISHES,
+  DESSERTS_PRICE,
   TEST_INDEX,
 } from "@/lib/constants"
 import { getMockDate, getMockTimeLabel } from "@/lib/mock-time"
+import type { DayMenu, Dish, OrderDay } from "@/lib/order-types"
+import {
+  calculateLunchLineTotal,
+  calculateOrderTotal,
+  getDessertDish,
+  getLunchDishGroups,
+  normalizeDessertQuantity,
+  sanitizeOrderDayDesserts,
+} from "@/lib/dessert"
+import { parseOrderDayParam } from "@/lib/qr-menu"
 
-export interface Dish {
-  id: string
-  name: string
-  description?: string
-  calories?: number
-}
-
-export interface DayMenu {
-  day: string
-  date: string
-  dishes: Dish[]
-  isAvailable?: boolean
-}
-
-interface OrderDay {
-  day: string
-  date: string
-  selectedDishes: string[]
-  deliveryTime: string
-  quantity: number
-  note?: string
-}
+export type { DayMenu, Dish } from "@/lib/order-types"
 
 export default function OrderPage() {
   const { t } = useLanguage()
@@ -87,7 +75,10 @@ export default function OrderPage() {
   const [isBannerReady, setIsBannerReady] = useState(false)
   const [bannerSize, setBannerSize] = useState<{ width: number; height: number } | null>(null)
   const [isBannerImageLoaded, setIsBannerImageLoaded] = useState(false)
+  /** Remount PhoneInput after order reset — library locks input when value cleared to "" */
+  const [phoneInputKey, setPhoneInputKey] = useState(0)
   const mockTimeLabel = getMockTimeLabel()
+  const qrDayAppliedRef = useRef(false)
 
   useEffect(() => {
     const now = getMockDate()
@@ -127,6 +118,17 @@ export default function OrderPage() {
 
   useEffect(() => {
     if (!banner?.url || !isBannerVisible) {
+      setIsBannerModalOpen(false)
+      setIsBannerReady(false)
+      setBannerSize(null)
+      return
+    }
+
+    // Came from QR `/menu` with ?day= — afisha already shown there, don't open again
+    if (
+      typeof window !== "undefined" &&
+      parseOrderDayParam(new URLSearchParams(window.location.search).get("day"))
+    ) {
       setIsBannerModalOpen(false)
       setIsBannerReady(false)
       setBannerSize(null)
@@ -179,14 +181,56 @@ export default function OrderPage() {
           selectedDishes: firstDrinkId ? [firstDrinkId] : [],
           deliveryTime: "12:00",
           quantity: 1,
+          dessertQuantity: 0,
           note: "",
         },
       ])
     }
   }
 
+  /** From QR `/menu?` → `/?day=tuesday|2`: select day and scroll to it */
+  useEffect(() => {
+    if (qrDayAppliedRef.current || !menu?.length) return
+    if (typeof window === "undefined") return
+    const dayKey = parseOrderDayParam(new URLSearchParams(window.location.search).get("day"))
+    if (!dayKey) return
+
+    const dayMenu = menu.find((m) => m.day === dayKey)
+    if (!dayMenu || dayMenu.isAvailable === false) return
+
+    qrDayAppliedRef.current = true
+
+    setOrderDays((prev) => {
+      if (prev.some((od) => od.day === dayKey)) return prev
+      const firstDrinkId = dayMenu.dishes[6]?.id
+      return [
+        ...prev,
+        {
+          day: dayMenu.day,
+          date: dayMenu.date,
+          selectedDishes: firstDrinkId ? [firstDrinkId] : [],
+          deliveryTime: "12:00",
+          quantity: 1,
+          dessertQuantity: 0,
+          note: "",
+        },
+      ]
+    })
+
+    const scroll = () => {
+      document.getElementById(`order-day-${dayKey}`)?.scrollIntoView({
+        behavior: "smooth",
+        block: "start",
+      })
+    }
+    // After paint; retry once if banner modal delayed layout
+    requestAnimationFrame(scroll)
+    const t = window.setTimeout(scroll, 600)
+    return () => window.clearTimeout(t)
+  }, [menu])
+
   const handleChange = (value: string) => {
-    setCustomerInfo({ ...customerInfo, phone: value.replace(/\D/g, "") })
+    setCustomerInfo((prev) => ({ ...prev, phone: value.replace(/\D/g, "") }))
   }
 
   const updateOrderDay = (day: string, updates: Partial<OrderDay>) => {
@@ -198,7 +242,11 @@ export default function OrderPage() {
         variant: "destructive",
       })
     }
-    setOrderDays(orderDays.map((od) => (od.day === day ? { ...od, ...updates } : od)))
+    setOrderDays(
+      orderDays.map((od) =>
+        od.day === day ? sanitizeOrderDayDesserts({ ...od, ...updates }) : od,
+      ),
+    )
   }
 
   const selectDish = (
@@ -240,19 +288,17 @@ export default function OrderPage() {
     updateOrderDay(day, { selectedDishes: newDishes })
   }
 
-  const calculateTotal = () => {
-    let total = 0
-
-    orderDays.forEach((orderDay) => {
-      const dishCount = orderDay.selectedDishes.length
-      if (dishCount === 4) {
-        total += PRICE_DISHES * orderDay.quantity
-      }
-      total += DELIVERY_FEE * orderDay.quantity // Delivery fee
+  const setDessertQuantity = (day: string, value: number) => {
+    const orderDay = orderDays.find((od) => od.day === day)
+    if (!orderDay) return
+    const next = sanitizeOrderDayDesserts({
+      ...orderDay,
+      dessertQuantity: normalizeDessertQuantity(value),
     })
-
-    return total
+    updateOrderDay(day, { dessertQuantity: next.dessertQuantity })
   }
+
+  const calculateTotal = () => calculateOrderTotal(orderDays)
 
   const canSubmitOrder = () => {
     if (!customerInfo.fullName || !customerInfo.phone || !customerInfo.office) {
@@ -303,12 +349,12 @@ export default function OrderPage() {
       return
     }
 
-    // Here you would send to your backend API
+    const sanitizedDays = orderDays.map((d) => sanitizeOrderDayDesserts(d))
     const orderData = {
       customer: customerInfo,
-      orderDays,
+      orderDays: sanitizedDays,
       paymentMethod,
-      total: calculateTotal(),
+      total: calculateOrderTotal(sanitizedDays),
       timestamp: new Date().toISOString(),
     }
 
@@ -338,6 +384,7 @@ export default function OrderPage() {
       floor: "",
       company: "",
     })
+    setPhoneInputKey((k) => k + 1)
   }
 
   return (
@@ -482,7 +529,8 @@ export default function OrderPage() {
                   return (
                     <div
                       key={dayMenu.day}
-                      className={`rounded-lg p-4 border ${
+                      id={`order-day-${dayMenu.day}`}
+                      className={`rounded-lg p-4 border scroll-mt-24 ${
                         !dayMenu.isAvailable
                           ? "bg-gray-500 border-gray-600 text-gray-400 pointer-events-none"
                           : "bg-[#002855] border-[#00A8E8]"
@@ -588,30 +636,32 @@ export default function OrderPage() {
                       {isSelected && (
                         <>
                           <div className="grid gap-4">
-                            {[
-                              {
-                                key: "salads",
-                                title: t("order.group.salads"),
-                                items: dayMenu.dishes.slice(0, 2),
-                              },
-                              {
-                                key: "soups",
-                                title: t("order.group.soups"),
-                                items: dayMenu.dishes.slice(2, 4),
-                              },
-                              {
-                                key: "mains",
-                                title: t("order.group.mains"),
-                                items: dayMenu.dishes.slice(4, 6),
-                              },
-                              {
-                                key: "drinks",
-                                title: t("order.group.drinks"),
-                                items: dayMenu.dishes.slice(6, 8),
-                              },
-                            ]
-                              .filter((group) => group.items.length > 0)
-                              .map((group) => {
+                            {(() => {
+                              const groups = getLunchDishGroups(dayMenu)
+                              return [
+                                {
+                                  key: "salads",
+                                  title: t("order.group.salads"),
+                                  items: groups.salads,
+                                },
+                                {
+                                  key: "soups",
+                                  title: t("order.group.soups"),
+                                  items: groups.soups,
+                                },
+                                {
+                                  key: "mains",
+                                  title: t("order.group.mains"),
+                                  items: groups.mains,
+                                },
+                                {
+                                  key: "drinks",
+                                  title: t("order.group.drinks"),
+                                  items: groups.drinks,
+                                },
+                              ]
+                                .filter((group) => group.items.length > 0)
+                                .map((group) => {
                                 const groupDishIds = group.items.map((item) => item.id)
                                 const isMandatoryGroup = group.key === "drinks"
                                 return (
@@ -668,24 +718,72 @@ export default function OrderPage() {
                                     </div>
                                   </div>
                                 )
-                              })}
+                              })
+                            })()}
                           </div>
 
-                          <div className="mt-4 rounded-md border border-[#00A8E8]/40 bg-[#001F3F] p-3 text-sm text-[#87CEEB]">
-                            <p className="font-semibold text-white">{t("order.extras.title")}</p>
-                            <p>
-                              {t("order.extras.desserts")}{" "}
-                              <span className="font-semibold text-white">
-                                {t("order.extras.dessertsPrice")}
-                              </span>
-                            </p>
-                            <p>
-                              {t("order.extras.pastries")}{" "}
-                              <span className="font-semibold text-white">
-                                {t("order.extras.pastriesPrice")}
-                              </span>
-                            </p>
-                            <p className="mt-2 text-[#87CEEB]">{t("order.extras.note")}</p>
+                          <div className="mt-4 rounded-md border border-[#00A8E8]/40 bg-[#001F3F] p-3 text-sm text-[#87CEEB] space-y-3">
+                            {(() => {
+                              const dessert = getDessertDish(dayMenu)
+                              const lunchReady = (orderDay?.selectedDishes.length || 0) === 4
+                              const dq = orderDay?.dessertQuantity || 0
+                              if (!dessert) {
+                                return (
+                                  <>
+                                    <p className="font-semibold text-white">{t("order.dessert.title")}</p>
+                                    <p>{t("order.dessert.unavailable")}</p>
+                                  </>
+                                )
+                              }
+                              return (
+                                <>
+                                  <p className="font-semibold text-white">{t("order.dessert.title")}</p>
+                                  <p>
+                                    {dessert.name} —{" "}
+                                    <span className="font-semibold text-white">
+                                      {DESSERTS_PRICE} ₸
+                                    </span>
+                                  </p>
+                                  <p className="text-xs">{t("order.dessert.hint")}</p>
+                                  <div className="flex items-center gap-3">
+                                    <Label className="text-white text-sm">
+                                      {t("order.dessert.quantity")}
+                                    </Label>
+                                    <Input
+                                      type="number"
+                                      inputMode="numeric"
+                                      min={0}
+                                      step={1}
+                                      disabled={!lunchReady}
+                                      value={dq}
+                                      onChange={(e) => {
+                                        const parsed = Number.parseInt(e.target.value, 10)
+                                        setDessertQuantity(
+                                          dayMenu.day,
+                                          Number.isNaN(parsed) ? 0 : parsed,
+                                        )
+                                      }}
+                                      className="bg-[#003366] w-20 h-8 px-3 border border-[#00A8E8] text-white"
+                                    />
+                                  </div>
+                                  {!lunchReady && (
+                                    <p className="text-xs text-yellow-200">
+                                      {t("order.dessert.needLunch")}
+                                    </p>
+                                  )}
+                                </>
+                              )
+                            })()}
+                            <div className="border-t border-[#00A8E8]/30 pt-2">
+                              <p className="font-semibold text-white">{t("order.extras.title")}</p>
+                              <p>
+                                {t("order.extras.pastries")}{" "}
+                                <span className="font-semibold text-white">
+                                  {t("order.extras.pastriesPrice")}
+                                </span>
+                              </p>
+                              <p className="mt-1 text-xs">{t("order.extras.note")}</p>
+                            </div>
                           </div>
                           <div className="mt-3 space-y-2">
                             <Label className="text-white text-sm">{t("order.note.title")}</Label>
@@ -753,6 +851,7 @@ export default function OrderPage() {
                       {t("order.phone")} *
                     </Label>
                     <PhoneInput
+                      key={phoneInputKey}
                       country="kz"
                       preferredCountries={["kz"]}
                       excludeCountries={["ru"]}
@@ -873,18 +972,27 @@ export default function OrderPage() {
                     <div className="space-y-2 text-sm">
                       {orderDays.map((orderDay) => {
                         const dishCount = orderDay.selectedDishes.length
-                        const mealPrice = dishCount === 4 ? PRICE_DISHES : 0
-                        const deliveryPrice = DELIVERY_FEE
+                        const lunchTotal = calculateLunchLineTotal(orderDay)
+                        const dessertQty = orderDay.dessertQuantity || 0
+                        const dessertTotal = dessertQty * DESSERTS_PRICE
 
                         return (
-                          <div key={orderDay.day} className="flex justify-between">
-                            <span className="text-white text-sm">
-                              {getDayName(orderDay.day)} ({dishCount - 1} {t("order.dishes")} ×{" "}
-                              {orderDay.quantity})
-                            </span>
-                            <span className="text-white text-sm">
-                              {(mealPrice + deliveryPrice) * orderDay.quantity} ₸
-                            </span>
+                          <div key={orderDay.day} className="space-y-1">
+                            <div className="flex justify-between">
+                              <span className="text-white text-sm">
+                                {getDayName(orderDay.day)} ({Math.max(dishCount - 1, 0)}{" "}
+                                {t("order.dishes")} × {orderDay.quantity})
+                              </span>
+                              <span className="text-white text-sm">{lunchTotal} ₸</span>
+                            </div>
+                            {dessertQty > 0 && (
+                              <div className="flex justify-between text-[#87CEEB]">
+                                <span className="text-xs">
+                                  {t("order.dessert.title")} × {dessertQty}
+                                </span>
+                                <span className="text-xs">{dessertTotal} ₸</span>
+                              </div>
+                            )}
                           </div>
                         )
                       })}

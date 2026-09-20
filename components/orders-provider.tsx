@@ -4,7 +4,8 @@ import type React from "react"
 import { createContext, useCallback, useContext, useEffect, useState } from "react"
 import { usePathname } from "next/navigation"
 
-import { DayMenu } from "@/app/page"
+import { DayMenu } from "@/lib/order-types"
+import { markPositionalDessert } from "@/lib/menu-excel"
 
 import { commonApi, dropboxApi, menuApi, Order, ordersApi } from "@/lib/api"
 import { useToast } from "@/hooks/use-toast"
@@ -16,11 +17,21 @@ import {
   BANNER,
 } from "@/lib/constants"
 import { getMockDate } from "@/lib/mock-time"
+import {
+  QR_MENU_DAYS,
+  dropboxFilePublicUrl,
+  matchQrMenuDayFromFileName,
+  preferRasterDropboxEntries,
+  withCacheBust,
+  type QrMenuDayNum,
+} from "@/lib/qr-menu"
 
 type WeekDay = {
   day: string
   date: string
 }
+
+export type QrMenuImage = { day: QrMenuDayNum; url: string; dlId: string }
 
 interface OrdersContextType {
   orders: Order[]
@@ -40,6 +51,8 @@ interface OrdersContextType {
   setIsBannerVisible: (status: boolean) => void
   banner: { url: string; dlId: string } | null
   setBanner: (banner: { url: string; dlId: string } | null) => void
+  /** QR day images from the same dropbox select as banner */
+  qrMenuImages: Partial<Record<QrMenuDayNum, QrMenuImage>>
   loadBanner: () => Promise<void>
   isLoadingBanner: boolean
 }
@@ -57,6 +70,9 @@ export const OrdersProvider: React.FC<{
   const [isMaintenanceMode, setIsMaintenanceMode] = useState(false)
   const [isBannerVisible, setIsBannerVisible] = useState(true)
   const [banner, setBanner] = useState<{ url: string; dlId: string } | null>(null)
+  const [qrMenuImages, setQrMenuImages] = useState<
+    Partial<Record<QrMenuDayNum, QrMenuImage>>
+  >({})
   const [menu, setMenu] = useState<DayMenu[]>([])
   const [token, setToken] = useState<string | undefined>(initialToken)
   const [hash, setHash] = useState<string | undefined>(initialHash)
@@ -74,10 +90,21 @@ export const OrdersProvider: React.FC<{
         return {
           day: day.day,
           date: day.date,
-          dishes: resData.reduce((arrNew: DayMenu["dishes"], elem, index) => {
-            if (indexDay + 1 === elem.day) arrNew.push({ id: `${index + 1}`, ...elem })
-            return arrNew
-          }, []),
+          dishes: markPositionalDessert(
+            resData.reduce((arrNew: DayMenu["dishes"], elem, index) => {
+              if (indexDay + 1 === elem.day) {
+                arrNew.push({
+                  id: `${index + 1}`,
+                  name: elem.name,
+                  description: elem.description,
+                  calories: elem.calories,
+                  type: elem.type,
+                  day: elem.day,
+                })
+              }
+              return arrNew
+            }, []),
+          ),
         }
       })
       const noAvailableDaysMenu = getNoAvailableDays(menu)
@@ -215,18 +242,19 @@ export const OrdersProvider: React.FC<{
   const loadBanner = useCallback(async () => {
     setIsLoadingBanner(true)
     try {
-      const res = await dropboxApi.getFiles({private: '-1'})
+      const res = await dropboxApi.getFiles({ private: "-1" })
       if (!res.success) {
         setBanner(null)
+        setQrMenuImages({})
         return
       }
-      
 
       const filesMap =
         res.data?.data?.["dropbox files"] ?? res.data?.["dropbox files"] ?? undefined
 
       if (!filesMap || typeof filesMap !== "object") {
         setBanner(null)
+        setQrMenuImages({})
         return
       }
 
@@ -243,15 +271,48 @@ export const OrdersProvider: React.FC<{
 
       if (match?.dl_id) {
         setBanner({
-          url: `https://ibronevik.ru/taxi/api/v1/dropbox/file/${match.dl_id}`,
+          url: withCacheBust(dropboxFilePublicUrl(match.dl_id), match.dl_id),
           dlId: match.dl_id,
         })
       } else {
         setBanner(null)
       }
+
+      // Same select → QR day slots (prefer jpg/png over leftover svg)
+      const byDay: Partial<Record<QrMenuDayNum, Array<{
+        dl_id?: string
+        json?: { name?: string; name_upload?: string }
+      }>>> = {}
+      for (const entry of entries) {
+        const name = entry.json?.name || entry.json?.name_upload || ""
+        const day = matchQrMenuDayFromFileName(name)
+        if (day && entry.dl_id) {
+          if (!byDay[day]) byDay[day] = []
+          byDay[day]!.push(entry)
+        }
+      }
+      const nextQr: Partial<Record<QrMenuDayNum, QrMenuImage>> = {}
+      for (const d of QR_MENU_DAYS) {
+        const best = preferRasterDropboxEntries(byDay[d.day] || [])
+        if (best?.dl_id) {
+          nextQr[d.day] = {
+            day: d.day,
+            dlId: String(best.dl_id),
+            url: withCacheBust(dropboxFilePublicUrl(String(best.dl_id)), String(best.dl_id)),
+          }
+        } else {
+          nextQr[d.day] = {
+            day: d.day,
+            dlId: `local-${d.day}`,
+            url: `/qr-placeholders/menu-azure-${d.day}.svg`,
+          }
+        }
+      }
+      setQrMenuImages(nextQr)
     } catch (error) {
       console.error(error)
       setBanner(null)
+      setQrMenuImages({})
     } finally {
       setIsLoadingBanner(false)
     }
@@ -299,6 +360,7 @@ export const OrdersProvider: React.FC<{
         setIsBannerVisible,
         banner,
         setBanner,
+        qrMenuImages,
         loadBanner,
         isLoadingBanner
       }}

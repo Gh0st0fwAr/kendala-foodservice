@@ -1,0 +1,317 @@
+[
+  {
+    "day": 1,
+    "name": "Крабовый салат с кукурузой",
+    "description": "",
+    "calories": "",
+    "type": "salad"
+  },
+  {
+    "day": 1,
+    "name": "Овощной салат по-домашнему",
+    "description": "",
+    "calories": "",
+    "type": "salad"
+  },
+  {
+    "day": 1,
+    "name": "Минестроне с курицей",
+    "description": "",
+    "calories": "",
+    "type": "soup"
+  },
+  {
+    "day": 1,
+    "name": "Рассольник классический",
+    "description": "",
+    "calories": "",
+    "type": "soup"
+  },
+  {
+    "day": 1,
+    "name": "Голень цыплёнка с картофелем",
+    "description": "",
+    "calories": "",
+    "type": "main"
+  },
+  {
+    "day": 1,
+    "name": "Тефтели с картофельным пюре",
+    "description": "",
+    "calories": "",
+    "type": "main"
+  },
+  {
+    "day": 1,
+    "name": "Компот из сухофруктов",
+    "description": "",
+    "calories": "",
+    "type": "drink"
+  },
+  {
+    "day": 1,
+    "name": "Морс клюквенный",
+    "description": "",
+    "calories": "",
+    "type": "drink"
+  },
+  {
+    "day": 1,
+    "name": "Тирамису",
+    "description": "Десерт дня · 690 ₸",
+    "calories": "",
+    "type": "dessert"
+  },
+  {
+    "day": 2,
+    "name": "Греческий салат",
+    "description": "",
+    "calories": "",
+    "type": "salad"
+  },
+  {
+    "day": 2,
+    "name": "Микс-салат с запечённой свёклой и куриным филе",
+    "description": "",
+    "calories": "",
+    "type": "salad"
+  },
+  {
+    "day": 2,
+    "name": "Грибной суп со сметаной",
+    "description": "",
+    "calories": "",
+    "type": "soup"
+  },
+  {
+    "day": 2,
+    "name": "Борщ с телятиной",
+    "description": "",
+    "calories": "",
+    "type": "soup"
+  },
+  {
+    "day": 2,
+    "name": "Фрикасе из телятины",
+    "description": "",
+    "calories": "",
+    "type": "main"
+  },
+  {
+    "day": 2,
+    "name": "Куриные шашлычки с припущенным рисом",
+    "description": "",
+    "calories": "",
+    "type": "main"
+  },
+  {
+    "day": 2,
+    "name": "Чай чёрный с лимоном",
+    "description": "",
+    "calories": "",
+    "type": "drink"
+  },
+  {
+    "day": 2,
+    "name": "Айран",
+    "description": "",
+    "calories": "",
+    "type": "drink"
+  },
+  {
+    "day": 2,
+    "name": "Чизкейк Нью-Йорк",
+    "description": "Десерт дня · 690 ₸",
+    "calories": "",
+    "type": "dessert"
+  },
+  {
+    "day": 3,
+    "name": "Спаржа с домашней морковью по-корейски",
+    "description": "",
+    "calories": "",
+    "type": "salad"
+  },
+  {
+    "day": 3,
+    "name": "Цезарь с курицей",
+    "description": "",
+    "calories": "",
+    "type": "salad"
+  },
+  {
+    "day": 3,
+    "name": "Кимчи тиге с телятиной",
+    "description": "",
+    "calories": "",
+    "type": "soup"
+  },
+  {
+    "day": 3,
+    "name": "Щи с цыплёнком",
+    "description": "",
+    "calories": "",
+    "type": "soup"
+  },
+  {
+    "day": 3,
+    "name": "Удон с овощами",
+    "description": "",
+    "calories": "",
+    "type": "main"
+  },
+  {
+    "day": 3,
+    "name": "Бифштекс с картофельным пюре",
+    "description": "",
+    "calories": "",
+    "type": "main"
+  },
+  {
+    "day": 3,
+    "name": "Компот ягодный",
+    "description": "",
+    "calories": "",
+    "type": "drink"
+  },
+  {
+    "day": 3,
+    "name": "Лимонад домашний",
+    "description": "",
+    "calories": "",
+    "type": "drink"
+  },
+  {
+    "day": 3,
+    "name": "Панакота с ягодами",
+    "description": "Десерт дня · 690 ₸",
+    "calories": "",
+    "type": "dessert"
+  },
+  {
+    "day": 4,
+    "name": "Хрустящие баклажаны темпура",
+    "description": "",
+    "calories": "",
+    "type": "salad"
+  },
+  {
+    "day": 4,
+    "name": "Тёплый салат с куриной печенью",
+    "description": "",
+    "calories": "",
+    "type": "salad"
+  },
+  {
+    "day": 4,
+    "name": "Азиатский суп с пельменями",
+    "description": "",
+    "calories": "",
+    "type": "soup"
+  },
+  {
+    "day": 4,
+    "name": "Мампар",
+    "description": "",
+    "calories": "",
+    "type": "soup"
+  },
+  {
+    "day": 4,
+    "name": "Манты с тыквой",
+    "description": "",
+    "calories": "",
+    "type": "main"
+  },
+  {
+    "day": 4,
+    "name": "Фрикасе из куриной грудки с припущенным рисом",
+    "description": "",
+    "calories": "",
+    "type": "main"
+  },
+  {
+    "day": 4,
+    "name": "Чай зелёный",
+    "description": "",
+    "calories": "",
+    "type": "drink"
+  },
+  {
+    "day": 4,
+    "name": "Морс облепиховый",
+    "description": "",
+    "calories": "",
+    "type": "drink"
+  },
+  {
+    "day": 4,
+    "name": "Наполеон",
+    "description": "Десерт дня · 690 ₸",
+    "calories": "",
+    "type": "dessert"
+  },
+  {
+    "day": 5,
+    "name": "Свежий салат со сметаной и зеленью",
+    "description": "",
+    "calories": "",
+    "type": "salad"
+  },
+  {
+    "day": 5,
+    "name": "Лёгкий салат с куриной грудкой и горчично-медовой заправкой",
+    "description": "",
+    "calories": "",
+    "type": "salad"
+  },
+  {
+    "day": 5,
+    "name": "Тайский кокосовый суп",
+    "description": "",
+    "calories": "",
+    "type": "soup"
+  },
+  {
+    "day": 5,
+    "name": "Гречневый суп с яйцом и телятиной",
+    "description": "",
+    "calories": "",
+    "type": "soup"
+  },
+  {
+    "day": 5,
+    "name": "Спагетти болоньезе",
+    "description": "",
+    "calories": "",
+    "type": "main"
+  },
+  {
+    "day": 5,
+    "name": "Шницель из курицы с картофелем",
+    "description": "",
+    "calories": "",
+    "type": "main"
+  },
+  {
+    "day": 5,
+    "name": "Компот яблочный",
+    "description": "",
+    "calories": "",
+    "type": "drink"
+  },
+  {
+    "day": 5,
+    "name": "Вода газированная",
+    "description": "",
+    "calories": "",
+    "type": "drink"
+  },
+  {
+    "day": 5,
+    "name": "Медовик",
+    "description": "Десерт дня · 690 ₸",
+    "calories": "",
+    "type": "dessert"
+  }
+]

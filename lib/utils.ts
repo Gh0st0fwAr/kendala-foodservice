@@ -1,5 +1,5 @@
-import { DayMenu } from "@/app/page"
-import { Order } from "@/lib/api"
+import { DayMenu } from "@/lib/order-types"
+import { calculateDayLineTotal, calculateOrderTotal as calcOrderTotal } from "@/lib/dessert"
 import { DELIVERY_FEE, PRICE_DISHES } from "@/lib/constants"
 import { clsx, type ClassValue } from "clsx"
 import { twMerge } from "tailwind-merge"
@@ -62,16 +62,26 @@ export const priceUtils = {
     orderDays: Array<{
       selectedDishes: string[]
       quantity: number
+      dessertQuantity?: number
     }>,
   ): number {
-    return orderDays.reduce((total, day) => {
-      const mealPrice = priceUtils.calculateMealPrice(day.selectedDishes.length)
-      const deliveryFee = priceUtils.calculateDeliveryFee()
-      return total + (mealPrice + deliveryFee) * day.quantity
-    }, 0)
+    return calcOrderTotal(orderDays)
+  },
+
+  calculateDayTotal(
+    day: {
+      selectedDishes: string[]
+      quantity: number
+      dessertQuantity?: number
+    },
+  ): number {
+    return calculateDayLineTotal(day)
   },
 
   formatPrice(amount: number): string {
     return `${amount.toLocaleString("ru-RU")} ₸`
   },
 }
+
+// re-export for callers that imported DayMenu via utils historically
+export type { DayMenu }

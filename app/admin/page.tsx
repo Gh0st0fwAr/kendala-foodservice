@@ -14,6 +14,7 @@ import { authApi, commonApi, dropboxApi, menuApi, ordersApi } from "@/lib/api"
 import * as XLSX from "xlsx"
 import { useOrders } from "@/components/orders-provider"
 import { BANNER, TEST_INDEX } from "@/lib/constants"
+import { parseMenuExcelRows } from "@/lib/menu-excel"
 import {
   Dialog,
   DialogContent,
@@ -31,6 +32,7 @@ import {
 } from "@/components/admin/AdminAuthCard"
 import { AdminMenuTab } from "@/components/admin/AdminMenuTab"
 import { AdminOrdersTab } from "@/components/admin/AdminOrdersTab"
+import { AdminQrMenuTab } from "@/components/admin/AdminQrMenuTab"
 import { AdminSettingsTab } from "@/components/admin/AdminSettingsTab"
 
 interface BaseStyles {
@@ -125,7 +127,12 @@ export default function AdminPage() {
 
   useEffect(() => {
     const storedTab = localStorage.getItem("admin_active_tab")
-    if (storedTab === "menu" || storedTab === "orders" || storedTab === "settings") {
+    if (
+      storedTab === "menu" ||
+      storedTab === "orders" ||
+      storedTab === "settings" ||
+      storedTab === "qr"
+    ) {
       setActiveTab(storedTab)
     }
   }, [])
@@ -329,11 +336,26 @@ export default function AdminPage() {
 
         // Конвертируем в JSON
         const jsonData = XLSX.utils.sheet_to_json(sheet)
+        const parsed = parseMenuExcelRows(jsonData as unknown[])
+        if (!parsed.ok) {
+          toast({
+            title: t("common.error"),
+            description: parsed.errors[0] || "Ошибка структуры Excel",
+            variant: "destructive",
+          })
+          return
+        }
+        if (parsed.warnings.length) {
+          toast({
+            title: "Проверьте Excel",
+            description: parsed.warnings.slice(0, 2).join(" · "),
+          })
+        }
 
         const dataDishes = {
           lang_vls: {
             dishes: {
-              [TEST_INDEX]: JSON.stringify(jsonData),
+              [TEST_INDEX]: JSON.stringify(parsed.dishes),
             },
           },
         }
@@ -627,6 +649,7 @@ export default function AdminPage() {
           <TabsList>
             <TabsTrigger value="menu">{t("admin.uploadMenu")}</TabsTrigger>
             <TabsTrigger value="orders">{t("admin.orders")}</TabsTrigger>
+            <TabsTrigger value="qr">QR-меню</TabsTrigger>
             <TabsTrigger value="settings">Настройки</TabsTrigger>
           </TabsList>
 
@@ -649,6 +672,9 @@ export default function AdminPage() {
               getVariantStyle={getVariantStyle}
               onExportOpen={() => setIsExportOpen(true)}
             />
+          </TabsContent>
+          <TabsContent value="qr">
+            <AdminQrMenuTab />
           </TabsContent>
           <TabsContent value="settings">
             <AdminSettingsTab

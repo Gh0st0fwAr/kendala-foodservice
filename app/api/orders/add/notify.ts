@@ -1,19 +1,10 @@
-import { DayMenu } from "@/app/page"
+import { DayMenu } from "@/lib/order-types"
 import { Order } from "@/lib/api"
-import { IS_SEND_NOTIFICATION, PRICE_DISHES } from "@/lib/constants"
+import { IS_SEND_NOTIFICATION } from "@/lib/constants"
+import { processOrderDaysForNotify, type ProcessedOrderDay } from "@/lib/order-notify"
 
 const TG_BOT_TOKEN: string | undefined = process.env.TELEGRAM_BOT_TOKEN
 const TG_GROUP_ID: string | undefined = process.env.TELEGRAM_GROUP_ID
-
-interface ProcessedOrderDay {
-  day: string
-  date: string
-  selectedDishes: string[] // Массив названий блюд, а не ID
-  deliveryTime: string
-  quantity: number
-  price: string
-  note?: string
-}
 
 interface ProcessedOrder extends Omit<Order, "orderDays"> {
   orderDays: ProcessedOrderDay[]
@@ -268,23 +259,7 @@ export default async function sendOrderNotifications(
   menu: DayMenu[],
 ): Promise<void> {
   try {
-    const dishes: Record<string, string> = menu.reduce(
-      (ret: Record<string, string>, menuDay: DayMenu) => {
-        menuDay.dishes.forEach((dish) => {
-          if (dish.id && dish.name) ret[dish.id] ||= dish.name
-        })
-        return ret
-      },
-      {},
-    )
-
-    const orderDaysData: ProcessedOrderDay[] = order.orderDays.map((day) => {
-      return {
-        ...day,
-        selectedDishes: day.selectedDishes.map((dishId) => dishes[dishId] || "—"),
-        price: `${PRICE_DISHES * day.quantity} тг`,
-      }
-    })
+    const orderDaysData: ProcessedOrderDay[] = processOrderDaysForNotify(order, menu)
 
     const orderData: ProcessedOrder = {
       customer: order.customer,

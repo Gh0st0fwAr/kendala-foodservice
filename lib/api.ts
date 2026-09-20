@@ -1,5 +1,5 @@
 // API utility functions for backend integration
-import { DayMenu } from "@/app/page"
+import { DayMenu } from "@/lib/order-types"
 import { LC } from "@/lib/constants"
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || ""
@@ -26,6 +26,8 @@ export interface DropboxFileSelectParams {
   ids?: string[]
   private?: string
   deleted?: string
+  /** Page size on ibronevik select; default without it is ~5 */
+  lc?: number
 }
 
 export interface DropboxFileGetParams {
@@ -49,6 +51,7 @@ export interface Order {
     selectedDishes: string[]
     deliveryTime: string
     quantity: number
+    dessertQuantity?: number
     note?: string
   }>
   paymentMethod: "cash" | "invoice"
@@ -83,6 +86,7 @@ export interface MenuRes {
   name: string
   description: string
   calories: number
+  type?: string
 }
 
 export interface LoginRes {
@@ -171,13 +175,14 @@ export const dropboxApi = {
   },
 
   async getFiles(params: DropboxFileSelectParams = {}): Promise<ApiResponse<any>> {
-    const { ids, private: privateValue, deleted } = params
+    const { ids, private: privateValue, deleted, lc = LC } = params
     const idsPath = ids && ids.length > 0 ? ids.join(",") : "null"
     const response = await fetch(`${API_BASE_URL}/api/dropbox/file/${idsPath}/select`, {
       method: "POST",
       body: JSON.stringify({
         private: privateValue,
         deleted,
+        lc,
       }),
     })
     return response.json()

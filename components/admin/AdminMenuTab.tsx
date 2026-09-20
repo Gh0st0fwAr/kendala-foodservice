@@ -36,8 +36,14 @@ export function AdminMenuTab({ onMenuFileChange, onMenuUpload }: AdminMenuTabPro
             <li>
               Колонка day с номерами для каждого дня недели (Понедельник - 1 ... Пятница - 5)
             </li>
-            <li>3 блюда (2 варианта) на каждый день + напиток (2 варианта)</li>
-            <li>Колонки: day, name, description, calories</li>
+            <li>
+              3 блюда (2 варианта) на каждый день + напиток (2 варианта) = 8 строк на день
+            </li>
+            <li>
+              Десерт дня (опционально): 9-я строка на день <strong>или</strong> колонка type/category =
+              dessert
+            </li>
+            <li>Колонки: day, name, description, calories [, type]</li>
           </ul>
         </div>
         <Button className="flex items-center gap-2" onClick={onMenuUpload}>
