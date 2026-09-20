@@ -19,9 +19,10 @@ export function isCompleteLunchSelection(selectedDishes: string[]): boolean {
 }
 
 /**
- * Dessert of the day from menu:
- * 1) dish with type/category dessert
- * 2) else 9th item (index 8) after lunch slots
+ * Dessert of the day from menu.
+ * Prefer type=dessert. Positional index 8 is only a runtime fallback for older
+ * uploaded menus — Excel upload requires an explicit type (see menu-excel.ts).
+ * Price is never taken from dish.description — always DESSERTS_PRICE.
  */
 export function getDessertDish(dayMenu: DayMenu | undefined): Dish | null {
   if (!dayMenu?.dishes?.length) return null
@@ -51,13 +52,19 @@ export function calculateDessertLineTotal(dessertQuantity: number): number {
   return qty * DESSERTS_PRICE
 }
 
-/** Lunch + delivery only (no dessert) — for cart line breakdown */
+/**
+ * Lunch + delivery (no dessert) — same rules as main before PR #10:
+ * - PRICE_DISHES only when selectedDishes.length === 4 (полный ланч: 3 блюда + напиток)
+ * - There is no separate 2/3-dish price tier in the app; cart label «N блюд» is dishCount−1
+ * - DELIVERY_FEE × quantity always (incomplete day in cart still shows delivery)
+ */
 export function calculateLunchLineTotal(day: {
   selectedDishes: string[]
   quantity: number
 }): number {
-  if (!isCompleteLunchSelection(day.selectedDishes)) return 0
-  return PRICE_DISHES * day.quantity + DELIVERY_FEE * day.quantity
+  const qty = day.quantity
+  const meal = isCompleteLunchSelection(day.selectedDishes) ? PRICE_DISHES * qty : 0
+  return meal + DELIVERY_FEE * qty
 }
 
 export function calculateDayLineTotal(day: {
@@ -66,7 +73,7 @@ export function calculateDayLineTotal(day: {
   dessertQuantity?: number
 }): number {
   const lunch = calculateLunchLineTotal(day)
-  if (!lunch) return 0
+  if (!isCompleteLunchSelection(day.selectedDishes)) return lunch
   return lunch + calculateDessertLineTotal(day.dessertQuantity ?? 0)
 }
 

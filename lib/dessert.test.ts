@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest"
 import {
   calculateDayLineTotal,
   calculateDessertLineTotal,
+  calculateLunchLineTotal,
   calculateOrderTotal,
   getDessertDish,
   getLunchDishGroups,
@@ -83,13 +84,25 @@ describe("pricing", () => {
     expect(total).toBe(2 * PRICE_DISHES + 2 * DELIVERY_FEE + 3 * DESSERTS_PRICE)
   })
 
-  it("day total: no dessert charge without complete lunch", () => {
+  it("day total: incomplete lunch keeps delivery only (main parity), no dessert", () => {
     const total = calculateDayLineTotal({
       selectedDishes: ["a", "b"],
       quantity: 1,
       dessertQuantity: 5,
     })
-    expect(total).toBe(0)
+    expect(total).toBe(DELIVERY_FEE)
+  })
+
+  it("main parity: PRICE_DISHES only for exactly 4 selected (no 2/3 tier)", () => {
+    expect(
+      calculateLunchLineTotal({ selectedDishes: ["1", "2"], quantity: 1 }),
+    ).toBe(DELIVERY_FEE)
+    expect(
+      calculateLunchLineTotal({ selectedDishes: ["1", "2", "3"], quantity: 1 }),
+    ).toBe(DELIVERY_FEE)
+    expect(
+      calculateLunchLineTotal({ selectedDishes: ["1", "2", "3", "4"], quantity: 1 }),
+    ).toBe(PRICE_DISHES + DELIVERY_FEE)
   })
 
   it("order total across days", () => {

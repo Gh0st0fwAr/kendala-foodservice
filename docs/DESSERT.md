@@ -2,47 +2,41 @@
 
 ## Запуск тестов
 
-Из папки проекта:
-
 ```bash
 cd "g:\Резюме и проекты\Фриланс\Kwork\Проекты\kendala-foodservice"
 npm test
-```
-
-Watch-режим:
-
-```bash
-npm run test:watch
 ```
 
 ## Где лежат тесты
 
 | Файл | Что покрывает |
 |------|----------------|
-| `lib/dessert.test.ts` | цена 690, тотал по дням, sanitize, слот десерта |
-| `lib/menu-excel.test.ts` | парсер Excel (8/9 строк, type=dessert) |
-| `lib/order-notify.test.ts` | JSON→уведомление: имя десерта и сумма |
+| `lib/dessert.test.ts` | 690, тотал, sanitize, parity цен с main (нет тарифов 2/3) |
+| `lib/menu-excel.test.ts` | контракт type-порядка, отказ от «голой» 9-й строки |
+| `lib/client-mock-menu.test.ts` | JSON + реальный `.xlsx` → DayMenu → notify |
+| `lib/order-notify.test.ts` | имя десерта и сумма в уведомлении |
 
-Конфиг: `vitest.config.ts`  
-Скрипт: `"test": "vitest run"` в `package.json`
+## Excel для админа (контракт)
 
-## Excel для админа
+Колонки: `day`, `name`, `description`, `calories`, `type`.
 
-На каждый день (1–5):
+На день (1–5), если `type` заполнен:
 
-1. 8 строк ланча как раньше (салат×2, суп×2, горячее×2, напиток×2)
-2. **9-я строка** = десерт дня  
-   **или** колонка `type` / `category` = `dessert`
-
-## TEMP: воскресенье / локальный тест дней
-
-В `lib/constants.ts`:
-
-```ts
-export const DEV_FORCE_MONDAY_MORNING = true // !!! снять перед продом
+```
+salad, salad, soup, soup, main, main, drink, drink, dessert
 ```
 
-Пока `true`, сайт считает время **понедельником 10:00** (`2026-09-21`), чтобы дни не были заблокированы.  
-Перед сдачей заказчику → **`false`**.
+- Цена десерта **только** `DESSERTS_PRICE` (690) в коде — `description` не парсится.
+- Без `type` допускается классический ланч из 8 строк (warning: нет десерта).
+- 9-я строка **без** `type=dessert` при загрузке **отклоняется** (не молчаливый positional).
 
-Альтернатива без флага: `http://localhost:3000/?mockTime=2026-09-21T10:00:00`
+Runtime `getDessertDish` ещё умеет взять 9-й слот у уже залитых меню без type — только страховка.
+
+## Цены ланча
+
+Как на main до десерта: `PRICE_DISHES` (3690) только при 4 выбранных слотах (3 блюда + напиток). Отдельных цен «2/3 блюда» в коде нет. Доставка `DELIVERY_FEE` × quantity.
+
+## TEMP: локальный тест дней
+
+`DEV_FORCE_MONDAY_MORNING` в `lib/constants.ts` — для прода **`false`**.  
+Альтернатива: `/?mockTime=2026-09-21T10:00:00`
