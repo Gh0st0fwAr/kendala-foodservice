@@ -1,3 +1,4 @@
+import { DEV_FORCE_MONDAY_MORNING } from "@/lib/constants"
 import { getMockDate } from "@/lib/mock-time"
 
 /** Dropbox basename prefixes: menu-azure-1 … menu-azure-5 (Mon–Fri) */
@@ -48,19 +49,24 @@ export function almatyToLunchDay(jsWeekday: number): QrMenuDayNum | null {
 }
 
 export type ResolveQrMenuDayOpts = {
-  /** Test-only override: pretend it's Monday. Never set in app code. */
+  /**
+   * Override DEV_FORCE_MONDAY_MORNING (tests / explicit callers).
+   * Default: value from constants.
+   */
   forceMonday?: boolean
 }
 
 /**
- * Resolve which day the QR page should open on (Asia/Almaty via getMockDate).
+ * Resolve which day the QR page should open on.
+ * Uses getMockDate() so DEV_FORCE_MONDAY_MORNING / ?mockTime apply.
  * Weekend: do NOT pretend it's Friday — autoDay=null, initialTab=1 for browsing.
  */
 export function resolveQrMenuDay(
   now: Date = getMockDate(),
   opts: ResolveQrMenuDayOpts = {},
 ): QrMenuResolve {
-  if (opts.forceMonday) {
+  const forceMonday = opts.forceMonday ?? DEV_FORCE_MONDAY_MORNING
+  if (forceMonday) {
     return { isWeekend: false, autoDay: 1, initialTab: 1 }
   }
   const jsDay = getAlmatyDayOfWeek(now)
