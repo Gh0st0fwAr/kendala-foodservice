@@ -73,9 +73,16 @@ export default function RestaurantQrMenuPage() {
     if (bannerLoadStarted.current) setBannerFetchDone(true)
   }, [isLoadingBanner])
 
-  // Preload day images only — do not block menu on heavy banner download
+  // Afisha blocks the screen — never starve it behind five heavy day images.
+  const afishaNeedsBanner =
+    bannerStatusKnown && isBannerVisible && !afishaDismissed && !!bannerUrl && !afishaImgLoaded
+
+  // Preload all five day images only after afisha no longer needs the network,
+  // or when afisha is off / dismissed / missing.
   useEffect(() => {
     if (isLoadingBanner) return
+    if (!bannerStatusKnown) return
+    if (afishaNeedsBanner) return
 
     const dayUrls = QR_MENU_DAYS.map((d) => {
       const img = qrMenuImages[d.day]
@@ -97,25 +104,26 @@ export default function RestaurantQrMenuPage() {
     return () => {
       cancelled = true
     }
-  }, [isLoadingBanner, dayImageVersion, qrMenuImages])
+  }, [
+    isLoadingBanner,
+    bannerStatusKnown,
+    afishaNeedsBanner,
+    dayImageVersion,
+    qrMenuImages,
+  ])
 
-  // Banner preload for afisha modal only
+  // Soft timeout: don't leave "Загрузка афиши…" forever if the proxy is slow
   useEffect(() => {
-    if (isLoadingBanner) return
-    if (!bannerUrl) {
-      setAfishaImgLoaded(true)
-      return
-    }
+    if (!bannerUrl || afishaImgLoaded) return
+    const timer = window.setTimeout(() => setAfishaImgLoaded(true), PRELOAD_TIMEOUT_MS)
+    return () => window.clearTimeout(timer)
+  }, [bannerUrl, afishaImgLoaded])
 
-    let cancelled = false
-    setAfishaImgLoaded(false)
-    void preloadUrl(bannerUrl).then(() => {
-      if (!cancelled) setAfishaImgLoaded(true)
-    })
-    return () => {
-      cancelled = true
-    }
-  }, [isLoadingBanner, bannerUrl])
+  // No file after fetch: don't spin forever when visibility flag is on
+  useEffect(() => {
+    if (!bannerFetchDone) return
+    if (!bannerUrl) setAfishaImgLoaded(true)
+  }, [bannerFetchDone, bannerUrl])
 
   const closeAfisha = () => setAfishaDismissed(true)
 
@@ -130,7 +138,10 @@ export default function RestaurantQrMenuPage() {
     ? withCacheBust(current.url, current.dlId)
     : null
   const showWeekendNotice = resolved.isWeekend && resolved.autoDay == null
-  const menuLoading = isLoadingBanner || !dayImagesReady
+  // While afisha is up, don't block the page behind on day preloads —
+  // days warm up after user closes afisha (or banner finishes).
+  const menuLoading =
+    isLoadingBanner || (!afishaNeedsBanner && !dayImagesReady && !showAfishaGate)
 
   return (
     <div className="relative min-h-screen bg-[#001F3F] text-white">
@@ -149,13 +160,23 @@ export default function RestaurantQrMenuPage() {
           />
 
           <div className="relative z-[101] flex w-fit max-h-[calc(100dvh-1.5rem)] max-w-[calc(100vw-1.5rem)] flex-col rounded-lg bg-white p-4 shadow-xl">
-            {bannerUrl && afishaImgLoaded ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img
-                src={bannerUrl}
-                alt="Афиша AZURE"
-                className="block h-auto max-h-[calc(100dvh-1.5rem-2rem-3.25rem)] w-auto max-w-[calc(100vw-1.5rem-2rem)] object-contain"
-              />
+            {bannerUrl ? (
+              <>
+                {!afishaImgLoaded ? (
+                  <p className="px-6 py-20 text-center text-sm text-gray-500">Загрузка афиши…</p>
+                ) : null}
+                {/* Visible img starts download immediately — highest priority vs day preloads */}
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={bannerUrl}
+                  alt="Афиша AZURE"
+                  onLoad={() => setAfishaImgLoaded(true)}
+                  onError={() => setAfishaImgLoaded(true)}
+                  className={`block h-auto max-h-[calc(100dvh-1.5rem-2rem-3.25rem)] w-auto max-w-[calc(100vw-1.5rem-2rem)] object-contain ${
+                    afishaImgLoaded ? "" : "hidden"
+                  }`}
+                />
+              </>
             ) : (
               <p className="px-6 py-20 text-center text-sm text-gray-500">Загрузка афиши…</p>
             )}
@@ -168,18 +189,20 @@ export default function RestaurantQrMenuPage() {
         </div>
       ) : null}
 
-      {/* Keep all day images in DOM (hidden) so browser cache is warm */}
-      <div className="pointer-events-none absolute h-0 w-0 overflow-hidden" aria-hidden>
-        {QR_MENU_DAYS.map((d) => {
-          const img = qrMenuImages[d.day]
-          if (!img?.url) return null
-          const src = withCacheBust(img.url, img.dlId)
-          return (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img key={`preload-${d.day}-${img.dlId}`} src={src} alt="" />
-          )
-        })}
-      </div>
+      {/* Keep day images in DOM after afisha releases bandwidth */}
+      {!afishaNeedsBanner ? (
+        <div className="pointer-events-none absolute h-0 w-0 overflow-hidden" aria-hidden>
+          {QR_MENU_DAYS.map((d) => {
+            const img = qrMenuImages[d.day]
+            if (!img?.url) return null
+            const src = withCacheBust(img.url, img.dlId)
+            return (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img key={`preload-${d.day}-${img.dlId}`} src={src} alt="" />
+            )
+          })}
+        </div>
+      ) : null}
 
       <main className="mx-auto flex min-h-screen max-w-lg flex-col px-3 pb-6 pt-4">
         <header className="mb-3 text-center">

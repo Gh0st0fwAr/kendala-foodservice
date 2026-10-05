@@ -3,6 +3,7 @@ import {
   almatyToLunchDay,
   getAlmatyDayOfWeek,
   matchQrMenuDayFromFileName,
+  preferRasterDropboxEntries,
   qrMenuFileBaseName,
   resolveQrMenuDay,
   withCacheBust,
@@ -53,6 +54,24 @@ describe("withCacheBust", () => {
   it("appends v=", () => {
     expect(withCacheBust("https://x/file/1", "abc")).toBe("https://x/file/1?v=abc")
     expect(withCacheBust("https://x/file/1?a=1", "2")).toBe("https://x/file/1?a=1&v=2")
+  })
+})
+
+describe("preferRasterDropboxEntries", () => {
+  it("picks newer png over older jpg (same day basename)", () => {
+    const best = preferRasterDropboxEntries([
+      { dl_id: "10", json: { name: "menu-azure-1.jpg" } },
+      { dl_id: "42", json: { name: "menu-azure-1.png" } },
+    ])
+    expect(best?.dl_id).toBe("42")
+  })
+
+  it("picks raster over svg even if svg has higher dl_id", () => {
+    const best = preferRasterDropboxEntries([
+      { dl_id: "99", json: { name: "menu-azure-2.svg" } },
+      { dl_id: "11", json: { name: "menu-azure-2.jpg" } },
+    ])
+    expect(best?.dl_id).toBe("11")
   })
 })
 

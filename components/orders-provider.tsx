@@ -271,11 +271,12 @@ export const OrdersProvider: React.FC<{
         json?: { name?: string; name_upload?: string }
       }>
 
-      const match = entries.find((entry) => {
+      const bannerCandidates = entries.filter((entry) => {
         const name = entry.json?.name || entry.json?.name_upload || ""
         const base = name.split(".")[0]?.toLowerCase()
         return base === BANNER.toLowerCase()
       })
+      const match = preferRasterDropboxEntries(bannerCandidates)
 
       if (match?.dl_id) {
         setBanner({
@@ -286,7 +287,7 @@ export const OrdersProvider: React.FC<{
         setBanner(null)
       }
 
-      // Same select → QR day slots (prefer jpg/webp over heavy png/svg)
+      // Same select → QR day slots (newest raster per day; svg only as fallback)
       const byDay: Partial<
         Record<
           QrMenuDayNum,

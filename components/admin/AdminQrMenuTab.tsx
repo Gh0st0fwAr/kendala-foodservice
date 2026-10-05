@@ -12,6 +12,7 @@ import {
   QR_MENU_DAYS,
   dropboxFilePublicUrl,
   matchQrMenuDayFromFileName,
+  preferRasterDropboxEntries,
   qrMenuFileBaseName,
   withCacheBust,
   type QrMenuDayNum,
@@ -54,18 +55,6 @@ function fileExt(name: string): string {
   return parts.length > 1 ? (parts.pop() || "").toLowerCase() : ""
 }
 
-/** Prefer jpg/png/webp over leftover svg mocks; then higher dl_id */
-function pickBestEntry(entries: DropboxEntry[]): DropboxEntry | null {
-  if (!entries.length) return null
-  const score = (e: DropboxEntry) => {
-    const ext = fileExt(entryName(e))
-    const raster = ["jpg", "jpeg", "png", "webp", "gif"].includes(ext) ? 1000 : 0
-    const id = Number(e.dl_id) || 0
-    return raster + id
-  }
-  return [...entries].sort((a, b) => score(b) - score(a))[0] || null
-}
-
 function apiErrorText(res: { error?: unknown; data?: { message?: string } }): string {
   if (typeof res.error === "string" && res.error.trim()) return res.error
   if (res.data?.message) return res.data.message
@@ -98,7 +87,7 @@ export function AdminQrMenuTab() {
       }
 
       for (const d of QR_MENU_DAYS) {
-        const best = pickBestEntry(byDay[d.day] || [])
+        const best = preferRasterDropboxEntries(byDay[d.day] || [])
         if (!best?.dl_id) continue
         const idx = next.findIndex((s) => s.day === d.day)
         if (idx < 0) continue

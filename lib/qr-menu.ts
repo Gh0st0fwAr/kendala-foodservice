@@ -124,8 +124,10 @@ export function dropboxFilePublicUrl(dlId: string): string {
 }
 
 /**
- * Prefer display-friendly files when several menu-azure-N exist.
- * jpg/webp first (usually smaller), then png, then svg — newest dl_id within tier.
+ * Prefer display files when several menu-azure-N exist.
+ * All rasters (jpg/png/webp/gif) are equal — newest dl_id wins.
+ * SVG mocks lose to any raster. Do NOT prefer jpg over a newer png:
+ * /menu used to do that and kept showing stale jpgs while admin showed new pngs.
  */
 export function preferRasterDropboxEntries<
   T extends { dl_id?: string; json?: { name?: string; name_upload?: string } },
@@ -134,11 +136,8 @@ export function preferRasterDropboxEntries<
   const score = (e: T) => {
     const name = e.json?.name || e.json?.name_upload || ""
     const ext = name.split(".").pop()?.toLowerCase() || ""
-    let tier = 0
-    if (ext === "jpg" || ext === "jpeg" || ext === "webp") tier = 3000
-    else if (ext === "png" || ext === "gif") tier = 2000
-    else if (ext === "svg") tier = 1000
-    return tier + (Number(e.dl_id) || 0)
+    const raster = ["jpg", "jpeg", "png", "webp", "gif"].includes(ext) ? 1_000_000 : 0
+    return raster + (Number(e.dl_id) || 0)
   }
   return [...entries].sort((a, b) => score(b) - score(a))[0] || null
 }
