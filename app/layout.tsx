@@ -26,6 +26,8 @@ export default async function RootLayout({ children }: { children: React.ReactNo
   return (
     <html lang="ru">
       <head>
+        <link rel="preconnect" href="https://ibronevik.ru" crossOrigin="anonymous" />
+        <link rel="dns-prefetch" href="https://ibronevik.ru" />
         <Script id="fb-pixel" strategy="afterInteractive">
           {`
             !function(f,b,e,v,n,t,s)
