@@ -26,9 +26,13 @@ export const TEST_INDEX: Mode = 1
 export const IS_SEND_NOTIFICATION: ModeNotif = 1
 
 /**
- * количество отображаемых заказов
+ * Page size for ibronevik list/select (orders + dropbox).
+ * Dropbox accumulates banner + svg mocks + jpg/png per day — 20 already truncates newer files.
  */
-export const LC = 20
+export const LC = 50
+
+/** Explicit page size for QR/banner dropbox select (keep ≥ number of menu assets). */
+export const DROPBOX_MENU_LC = 50
 
 export const BANNER = "banner-azure"
 

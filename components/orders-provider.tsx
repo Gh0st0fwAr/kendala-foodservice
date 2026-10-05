@@ -15,14 +15,16 @@ import {
   ORDER_START_MINUTS,
   TEST_INDEX,
   BANNER,
+  DROPBOX_MENU_LC,
 } from "@/lib/constants"
 import { getMockDate } from "@/lib/mock-time"
 import {
   QR_MENU_DAYS,
+  buildQrMenuPlaceholders,
   dropboxFilePublicUrl,
   matchQrMenuDayFromFileName,
   preferRasterDropboxEntries,
-  withCacheBust,
+  qrMenuPlaceholderUrl,
   type QrMenuDayNum,
 } from "@/lib/qr-menu"
 
@@ -48,6 +50,8 @@ interface OrdersContextType {
   isMaintenanceMode: boolean
   setIsMaintenanceMode: (status: boolean) => void
   isBannerVisible: boolean
+  /** true after banner visibility flag fetched from API */
+  bannerStatusKnown: boolean
   setIsBannerVisible: (status: boolean) => void
   banner: { url: string; dlId: string } | null
   setBanner: (banner: { url: string; dlId: string } | null) => void
@@ -68,11 +72,13 @@ export const OrdersProvider: React.FC<{
   const { toast } = useToast()
   const [orders, setOrders] = useState<Order[]>([])
   const [isMaintenanceMode, setIsMaintenanceMode] = useState(false)
-  const [isBannerVisible, setIsBannerVisible] = useState(true)
+  /** false until /api/common/banner resolves — avoids flash of afisha modal */
+  const [bannerStatusKnown, setBannerStatusKnown] = useState(false)
+  const [isBannerVisible, setIsBannerVisible] = useState(false)
   const [banner, setBanner] = useState<{ url: string; dlId: string } | null>(null)
   const [qrMenuImages, setQrMenuImages] = useState<
     Partial<Record<QrMenuDayNum, QrMenuImage>>
-  >({})
+  >(() => buildQrMenuPlaceholders())
   const [menu, setMenu] = useState<DayMenu[]>([])
   const [token, setToken] = useState<string | undefined>(initialToken)
   const [hash, setHash] = useState<string | undefined>(initialHash)
@@ -236,16 +242,18 @@ export const OrdersProvider: React.FC<{
     } catch (error) {
       setIsBannerVisible(false)
       console.error(error)
+    } finally {
+      setBannerStatusKnown(true)
     }
   }
 
   const loadBanner = useCallback(async () => {
     setIsLoadingBanner(true)
     try {
-      const res = await dropboxApi.getFiles({ private: "-1" })
+      const res = await dropboxApi.getFiles({ private: "-1", lc: DROPBOX_MENU_LC })
       if (!res.success) {
         setBanner(null)
-        setQrMenuImages({})
+        setQrMenuImages(buildQrMenuPlaceholders())
         return
       }
 
@@ -254,7 +262,7 @@ export const OrdersProvider: React.FC<{
 
       if (!filesMap || typeof filesMap !== "object") {
         setBanner(null)
-        setQrMenuImages({})
+        setQrMenuImages(buildQrMenuPlaceholders())
         return
       }
 
@@ -271,18 +279,23 @@ export const OrdersProvider: React.FC<{
 
       if (match?.dl_id) {
         setBanner({
-          url: withCacheBust(dropboxFilePublicUrl(match.dl_id), match.dl_id),
-          dlId: match.dl_id,
+          url: dropboxFilePublicUrl(String(match.dl_id)),
+          dlId: String(match.dl_id),
         })
       } else {
         setBanner(null)
       }
 
-      // Same select → QR day slots (prefer jpg/png over leftover svg)
-      const byDay: Partial<Record<QrMenuDayNum, Array<{
-        dl_id?: string
-        json?: { name?: string; name_upload?: string }
-      }>>> = {}
+      // Same select → QR day slots (prefer jpg/webp over heavy png/svg)
+      const byDay: Partial<
+        Record<
+          QrMenuDayNum,
+          Array<{
+            dl_id?: string
+            json?: { name?: string; name_upload?: string }
+          }>
+        >
+      > = {}
       for (const entry of entries) {
         const name = entry.json?.name || entry.json?.name_upload || ""
         const day = matchQrMenuDayFromFileName(name)
@@ -298,13 +311,13 @@ export const OrdersProvider: React.FC<{
           nextQr[d.day] = {
             day: d.day,
             dlId: String(best.dl_id),
-            url: withCacheBust(dropboxFilePublicUrl(String(best.dl_id)), String(best.dl_id)),
+            url: dropboxFilePublicUrl(String(best.dl_id)),
           }
         } else {
           nextQr[d.day] = {
             day: d.day,
             dlId: `local-${d.day}`,
-            url: `/qr-placeholders/menu-azure-${d.day}.svg`,
+            url: qrMenuPlaceholderUrl(d.day),
           }
         }
       }
@@ -312,7 +325,7 @@ export const OrdersProvider: React.FC<{
     } catch (error) {
       console.error(error)
       setBanner(null)
-      setQrMenuImages({})
+      setQrMenuImages(buildQrMenuPlaceholders())
     } finally {
       setIsLoadingBanner(false)
     }
@@ -357,6 +370,7 @@ export const OrdersProvider: React.FC<{
         isMaintenanceMode,
         setIsMaintenanceMode,
         isBannerVisible,
+        bannerStatusKnown,
         setIsBannerVisible,
         banner,
         setBanner,

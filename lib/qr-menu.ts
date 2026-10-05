@@ -81,6 +81,26 @@ export function qrMenuFileBaseName(day: QrMenuDayNum): string {
   return `${QR_MENU_FILE_PREFIX}-${day}`
 }
 
+/** Local SVG fallbacks when dropbox has no file for the day */
+export function qrMenuPlaceholderUrl(day: QrMenuDayNum): string {
+  return `/qr-placeholders/menu-azure-${day}.svg`
+}
+
+export function buildQrMenuPlaceholders(): Record<
+  QrMenuDayNum,
+  { day: QrMenuDayNum; url: string; dlId: string }
+> {
+  const out = {} as Record<QrMenuDayNum, { day: QrMenuDayNum; url: string; dlId: string }>
+  for (const d of QR_MENU_DAYS) {
+    out[d.day] = {
+      day: d.day,
+      dlId: `local-${d.day}`,
+      url: qrMenuPlaceholderUrl(d.day),
+    }
+  }
+  return out
+}
+
 /** Match dropbox file name (with or without extension) to day 1–5 */
 export function matchQrMenuDayFromFileName(fileName: string): QrMenuDayNum | null {
   const base = fileName.split("/").pop()?.split(".")[0]?.toLowerCase() || ""
@@ -103,7 +123,10 @@ export function dropboxFilePublicUrl(dlId: string): string {
   return `https://ibronevik.ru/taxi/api/v1/dropbox/file/${dlId}`
 }
 
-/** Prefer raster over leftover svg when several menu-azure-N exist */
+/**
+ * Prefer display-friendly files when several menu-azure-N exist.
+ * jpg/webp first (usually smaller), then png, then svg — newest dl_id within tier.
+ */
 export function preferRasterDropboxEntries<
   T extends { dl_id?: string; json?: { name?: string; name_upload?: string } },
 >(entries: T[]): T | null {
@@ -111,8 +134,11 @@ export function preferRasterDropboxEntries<
   const score = (e: T) => {
     const name = e.json?.name || e.json?.name_upload || ""
     const ext = name.split(".").pop()?.toLowerCase() || ""
-    const raster = ["jpg", "jpeg", "png", "webp", "gif"].includes(ext) ? 1000 : 0
-    return raster + (Number(e.dl_id) || 0)
+    let tier = 0
+    if (ext === "jpg" || ext === "jpeg" || ext === "webp") tier = 3000
+    else if (ext === "png" || ext === "gif") tier = 2000
+    else if (ext === "svg") tier = 1000
+    return tier + (Number(e.dl_id) || 0)
   }
   return [...entries].sort((a, b) => score(b) - score(a))[0] || null
 }

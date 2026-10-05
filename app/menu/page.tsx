@@ -11,17 +11,38 @@ import {
 } from "@/lib/qr-menu"
 import { Button } from "@/components/ui/button"
 
-function preloadUrl(url: string): Promise<void> {
+const PRELOAD_TIMEOUT_MS = 12_000
+
+function preloadUrl(url: string, timeoutMs = PRELOAD_TIMEOUT_MS): Promise<void> {
   return new Promise((resolve) => {
     const img = new window.Image()
-    img.onload = () => resolve()
-    img.onerror = () => resolve()
+    let done = false
+    const finish = () => {
+      if (done) return
+      done = true
+      resolve()
+    }
+    const timer = window.setTimeout(finish, timeoutMs)
+    img.onload = () => {
+      window.clearTimeout(timer)
+      finish()
+    }
+    img.onerror = () => {
+      window.clearTimeout(timer)
+      finish()
+    }
     img.src = url
   })
 }
 
 export default function RestaurantQrMenuPage() {
-  const { banner, isBannerVisible, isLoadingBanner, qrMenuImages } = useOrders()
+  const {
+    banner,
+    isBannerVisible,
+    bannerStatusKnown,
+    isLoadingBanner,
+    qrMenuImages,
+  } = useOrders()
   const resolved = useMemo(() => resolveQrMenuDay(), [])
   const [tab, setTab] = useState<QrMenuDayNum>(resolved.initialTab)
 
@@ -35,6 +56,15 @@ export default function RestaurantQrMenuPage() {
     ? withCacheBust(banner.url, banner.dlId || "banner")
     : null
 
+  const dayImageVersion = useMemo(
+    () =>
+      QR_MENU_DAYS.map((d) => {
+        const img = qrMenuImages[d.day]
+        return img ? `${d.day}:${img.dlId}:${img.url}` : `${d.day}:`
+      }).join("|"),
+    [qrMenuImages],
+  )
+
   useEffect(() => {
     if (isLoadingBanner) {
       bannerLoadStarted.current = true
@@ -43,50 +73,62 @@ export default function RestaurantQrMenuPage() {
     if (bannerLoadStarted.current) setBannerFetchDone(true)
   }, [isLoadingBanner])
 
-  // One-shot: preload afisha + all 5 day images in parallel after select
+  // Preload day images only — do not block menu on heavy banner download
   useEffect(() => {
     if (isLoadingBanner) return
 
-    const dayUrls = QR_MENU_DAYS.map((d) => qrMenuImages[d.day]?.url).filter(
-      (u): u is string => Boolean(u),
-    )
+    const dayUrls = QR_MENU_DAYS.map((d) => {
+      const img = qrMenuImages[d.day]
+      return img?.url ? withCacheBust(img.url, img.dlId) : null
+    }).filter((u): u is string => Boolean(u))
 
-    if (!bannerUrl && dayUrls.length === 0) {
-      setAfishaImgLoaded(false)
-      setDayImagesReady(Object.keys(qrMenuImages).length > 0)
+    let cancelled = false
+    setDayImagesReady(false)
+
+    if (dayUrls.length === 0) {
+      setDayImagesReady(true)
       return
     }
 
-    let cancelled = false
-    setAfishaImgLoaded(false)
-    setDayImagesReady(false)
-
-    const jobs: Promise<void>[] = dayUrls.map((url) => preloadUrl(url))
-    if (bannerUrl) {
-      jobs.push(
-        preloadUrl(bannerUrl).then(() => {
-          if (!cancelled) setAfishaImgLoaded(true)
-        }),
-      )
-    } else {
-      setAfishaImgLoaded(true)
-    }
-
-    void Promise.all(jobs).then(() => {
+    void Promise.all(dayUrls.map((url) => preloadUrl(url))).then(() => {
       if (!cancelled) setDayImagesReady(true)
     })
 
     return () => {
       cancelled = true
     }
-  }, [isLoadingBanner, bannerUrl, qrMenuImages])
+  }, [isLoadingBanner, dayImageVersion, qrMenuImages])
+
+  // Banner preload for afisha modal only
+  useEffect(() => {
+    if (isLoadingBanner) return
+    if (!bannerUrl) {
+      setAfishaImgLoaded(true)
+      return
+    }
+
+    let cancelled = false
+    setAfishaImgLoaded(false)
+    void preloadUrl(bannerUrl).then(() => {
+      if (!cancelled) setAfishaImgLoaded(true)
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [isLoadingBanner, bannerUrl])
 
   const closeAfisha = () => setAfishaDismissed(true)
 
   const showAfishaGate =
-    !afishaDismissed && isBannerVisible && (!bannerFetchDone || !!bannerUrl)
+    bannerStatusKnown &&
+    !afishaDismissed &&
+    isBannerVisible &&
+    (!bannerFetchDone || !!bannerUrl)
 
   const current = qrMenuImages[tab]
+  const currentUrl = current?.url
+    ? withCacheBust(current.url, current.dlId)
+    : null
   const showWeekendNotice = resolved.isWeekend && resolved.autoDay == null
   const menuLoading = isLoadingBanner || !dayImagesReady
 
@@ -131,9 +173,10 @@ export default function RestaurantQrMenuPage() {
         {QR_MENU_DAYS.map((d) => {
           const img = qrMenuImages[d.day]
           if (!img?.url) return null
+          const src = withCacheBust(img.url, img.dlId)
           return (
             // eslint-disable-next-line @next/next/no-img-element
-            <img key={`preload-${d.day}-${img.dlId}`} src={img.url} alt="" />
+            <img key={`preload-${d.day}-${img.dlId}`} src={src} alt="" />
           )
         })}
       </div>
@@ -178,11 +221,11 @@ export default function RestaurantQrMenuPage() {
         <div className="flex flex-1 flex-col items-center justify-start">
           {menuLoading ? (
             <p className="text-sm text-[#87CEEB]">Загрузка меню на неделю…</p>
-          ) : current?.url ? (
+          ) : currentUrl ? (
             // eslint-disable-next-line @next/next/no-img-element
             <img
-              key={`${tab}-${current.dlId}`}
-              src={current.url}
+              key={`${tab}-${current?.dlId}`}
+              src={currentUrl}
               alt={`Меню ${QR_MENU_DAYS.find((d) => d.day === tab)?.label}`}
               className="w-full max-w-full rounded-md object-contain"
             />
